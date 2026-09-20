@@ -1,0 +1,821 @@
+============================================================
+MULTILINGUAL INTELLIGENCE PLATFORM - PYTHON SNAPSHOT
+Generated: Sun 09/20/2026 18:42:43.95
+Root: D:\Projects\Capstone\Multilingual-Intelligence-Platform\sentiment-stance-service
+============================================================
+
+
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\sentiment-stance-service\app.py
+============================================================
+
+from flask import Flask
+
+from config import Config
+
+from modules.process.routes import process_bp
+from modules.sentiment.routes import sentiment_bp
+from modules.stance.routes import stance_bp
+
+
+def create_app():
+    """
+    Create and configure the Flask application.
+    """
+
+    app = Flask(__name__)
+
+    app.config.from_object(Config)
+
+    # -----------------------------------------
+    # Main processing endpoint
+    # -----------------------------------------
+
+    app.register_blueprint(
+        process_bp,
+        url_prefix=f"{Config.API_PREFIX}/analyze"
+    )
+
+    # -----------------------------------------
+    # Individual sentiment endpoint
+    # -----------------------------------------
+
+    app.register_blueprint(
+        sentiment_bp,
+        url_prefix=f"{Config.API_PREFIX}/sentiment"
+    )
+
+    # -----------------------------------------
+    # Individual stance endpoint
+    # -----------------------------------------
+
+    app.register_blueprint(
+        stance_bp,
+        url_prefix=f"{Config.API_PREFIX}/stance"
+    )
+
+    # -----------------------------------------
+    # Service information
+    # -----------------------------------------
+
+    @app.get("/")
+    def home():
+        return {
+            "service": Config.SERVICE_NAME,
+            "version": Config.SERVICE_VERSION,
+            "status": "running"
+        }
+
+    # -----------------------------------------
+    # Health check
+    # -----------------------------------------
+
+    @app.get("/health")
+    def health():
+        return {
+            "service": Config.SERVICE_NAME,
+            "status": "healthy"
+        }
+
+    return app
+
+
+app = create_app()
+
+
+if __name__ == "__main__":
+    app.run(
+        host="0.0.0.0",
+        port=Config.PORT,
+        debug=Config.DEBUG
+    )
+
+
+
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\sentiment-stance-service\config.py
+============================================================
+
+import os
+
+
+class Config:
+    """
+    Configuration for the Sentiment + Stance Service.
+    """
+
+    DEBUG = os.getenv(
+        "DEBUG",
+        "True"
+    ).lower() == "true"
+
+    SERVICE_NAME = "sentiment-stance-service"
+
+    SERVICE_VERSION = os.getenv(
+        "SERVICE_VERSION",
+        "1.0.0"
+    )
+
+    API_PREFIX = os.getenv(
+        "API_PREFIX",
+        "/internal/v1"
+    )
+
+    PORT = int(
+        os.getenv(
+            "PORT",
+            "8002"
+        )
+    )
+
+
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\sentiment-stance-service\models\base_models.py
+============================================================
+.
+class PredictionConfidence:
+    """
+    Represents a prediction label and confidence.
+    """
+
+    def __init__(
+        self,
+        label,
+        confidence
+    ):
+        self.label = label
+        self.confidence = confidence
+
+    def to_dict(self):
+        return {
+            "label": self.label,
+            "confidence": self.confidence
+        }
+
+
+class Prediction:
+    """
+    Represents the combined sentiment and stance
+    prediction for an aspect.
+    """
+
+    def __init__(
+        self,
+        aspect,
+        category,
+        sentiment,
+        stance
+    ):
+        self.aspect = aspect
+        self.category = category
+        self.sentiment = sentiment
+        self.stance = stance
+
+    def to_dict(self):
+        return {
+            "aspect": self.aspect,
+            "category": self.category,
+            "sentiment": self.sentiment,
+            "stance": self.stance
+        }
+.
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\sentiment-stance-service\modules\process\processor.py
+============================================================
+.
+from modules.sentiment.processor import predict_sentiment
+from modules.stance.processor import predict_stance
+
+
+def analyze_text(
+    text,
+    language,
+    aspects
+):
+    """
+    Execute sentiment and stance prediction
+    for all supplied aspects.
+    """
+
+    predictions = []
+
+    for aspect_data in aspects:
+
+        aspect_text = aspect_data.get(
+            "text",
+            ""
+        )
+
+        category = aspect_data.get(
+            "category",
+            "Other"
+        )
+
+        if not aspect_text:
+            continue
+
+        # -----------------------------------------
+        # Sentiment prediction
+        # -----------------------------------------
+
+        sentiment = predict_sentiment(
+            text=text,
+            aspect=aspect_text
+        )
+
+        # -----------------------------------------
+        # Stance prediction
+        # -----------------------------------------
+
+        stance = predict_stance(
+            text=text,
+            target=aspect_text
+        )
+
+        # -----------------------------------------
+        # Combined prediction
+        # -----------------------------------------
+
+        predictions.append({
+            "aspect": aspect_text,
+            "category": category,
+            "sentiment": sentiment,
+            "stance": stance
+        })
+
+    return predictions
+.
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\sentiment-stance-service\modules\process\routes.py
+============================================================
+.
+from flask import Blueprint
+
+from .views import analyze
+
+
+process_bp = Blueprint(
+    "process",
+    __name__
+)
+
+
+process_bp.route(
+    "",
+    methods=["POST"]
+)(analyze)
+.
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\sentiment-stance-service\modules\process\views.py
+============================================================
+.
+from flask import request, jsonify
+
+from .processor import analyze_text
+
+
+def analyze():
+    """
+    Main Service 2 endpoint.
+
+    Receives the output of Service 1 and performs
+    sentiment and stance analysis.
+    """
+
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict):
+        return jsonify({
+            "request_id": None,
+            "status": "error",
+            "error": {
+                "code": "INVALID_INPUT",
+                "message": "Request body must be a JSON object."
+            },
+            "metadata": {
+                "service": "sentiment-stance-service"
+            }
+        }), 400
+
+    request_id = data.get(
+        "request_id"
+    )
+
+    text = data.get(
+        "text"
+    )
+
+    language = data.get(
+        "language"
+    )
+
+    aspects = data.get(
+        "aspects"
+    )
+
+    # -----------------------------------------
+    # Validate request ID
+    # -----------------------------------------
+
+    if not request_id:
+
+        return jsonify({
+            "request_id": None,
+            "status": "error",
+            "error": {
+                "code": "MISSING_REQUEST_ID",
+                "message": "Field 'request_id' is required."
+            },
+            "metadata": {
+                "service": "sentiment-stance-service"
+            }
+        }), 400
+
+    # -----------------------------------------
+    # Validate text
+    # -----------------------------------------
+
+    if not isinstance(
+        text,
+        str
+    ) or not text.strip():
+
+        return jsonify({
+            "request_id": request_id,
+            "status": "error",
+            "error": {
+                "code": "INVALID_TEXT",
+                "message": "Valid text is required."
+            },
+            "metadata": {
+                "service": "sentiment-stance-service"
+            }
+        }), 400
+
+    # -----------------------------------------
+    # Validate language
+    # -----------------------------------------
+
+    if not isinstance(
+        language,
+        dict
+    ):
+
+        return jsonify({
+            "request_id": request_id,
+            "status": "error",
+            "error": {
+                "code": "INVALID_LANGUAGE",
+                "message": "Valid language information is required."
+            },
+            "metadata": {
+                "service": "sentiment-stance-service"
+            }
+        }), 400
+
+    # -----------------------------------------
+    # Validate aspects
+    # -----------------------------------------
+
+    if not isinstance(
+        aspects,
+        list
+    ):
+
+        return jsonify({
+            "request_id": request_id,
+            "status": "error",
+            "error": {
+                "code": "INVALID_ASPECTS",
+                "message": "Field 'aspects' must be a list."
+            },
+            "metadata": {
+                "service": "sentiment-stance-service"
+            }
+        }), 400
+
+    try:
+
+        predictions = analyze_text(
+            text=text,
+            language=language,
+            aspects=aspects
+        )
+
+        return jsonify({
+            "request_id": request_id,
+            "status": "success",
+            "predictions": predictions,
+            "metadata": {
+                "service": "sentiment-stance-service",
+                "service_version": "1.0.0",
+                "model_version": "mvp-rule-based"
+            }
+        }), 200
+
+    except Exception as error:
+
+        return jsonify({
+            "request_id": request_id,
+            "status": "error",
+            "error": {
+                "code": "PROCESSING_ERROR",
+                "message": str(error)
+            },
+            "metadata": {
+                "service": "sentiment-stance-service"
+            }
+        }), 500
+.
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\sentiment-stance-service\modules\sentiment\models.py
+============================================================
+.
+.
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\sentiment-stance-service\modules\sentiment\processor.py
+============================================================
+.
+POSITIVE_WORDS = {
+    "excellent",
+    "good",
+    "great",
+    "amazing",
+    "awesome",
+    "fantastic",
+    "love",
+    "loved",
+    "best",
+    "perfect",
+    "nice",
+    "wonderful",
+    "satisfied",
+    "smooth",
+    "fast",
+    "reliable"
+}
+
+
+NEGATIVE_WORDS = {
+    "bad",
+    "poor",
+    "terrible",
+    "horrible",
+    "worst",
+    "hate",
+    "hated",
+    "slow",
+    "expensive",
+    "problem",
+    "problems",
+    "issue",
+    "issues",
+    "disappointing",
+    "disappointed",
+    "broken",
+    "weak"
+}
+
+
+def predict_sentiment(
+    text,
+    aspect
+):
+    """
+    Predict sentiment for a given aspect.
+
+    MVP implementation uses a simple keyword-based
+    approach. This will later be replaced by the
+    actual multilingual ML model.
+    """
+
+    text_lower = text.lower()
+
+    positive_count = sum(
+        1
+        for word in POSITIVE_WORDS
+        if word in text_lower
+    )
+
+    negative_count = sum(
+        1
+        for word in NEGATIVE_WORDS
+        if word in text_lower
+    )
+
+    if positive_count > negative_count:
+        label = "positive"
+
+        confidence = min(
+            0.60 + positive_count * 0.08,
+            0.95
+        )
+
+    elif negative_count > positive_count:
+        label = "negative"
+
+        confidence = min(
+            0.60 + negative_count * 0.08,
+            0.95
+        )
+
+    else:
+        label = "neutral"
+        confidence = 0.60
+
+    return {
+        "label": label,
+        "confidence": round(
+            confidence,
+            2
+        )
+    }
+.
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\sentiment-stance-service\modules\sentiment\routes.py
+============================================================
+.
+from flask import Blueprint
+
+from .views import predict_sentiment_view
+
+
+sentiment_bp = Blueprint(
+    "sentiment",
+    __name__
+)
+
+
+sentiment_bp.route(
+    "/predict",
+    methods=["POST"]
+)(predict_sentiment_view)
+.
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\sentiment-stance-service\modules\sentiment\views.py
+============================================================
+.
+from flask import request, jsonify
+
+from .processor import predict_sentiment
+
+
+def predict_sentiment_view():
+    """
+    Handle sentiment prediction request.
+    """
+
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict):
+        return jsonify({
+            "status": "error",
+            "error": {
+                "code": "INVALID_INPUT",
+                "message": "Request body must be a JSON object."
+            }
+        }), 400
+
+    text = data.get("text")
+    aspect = data.get("aspect")
+
+    if not isinstance(text, str) or not text.strip():
+        return jsonify({
+            "status": "error",
+            "error": {
+                "code": "INVALID_TEXT",
+                "message": "Valid text is required."
+            }
+        }), 400
+
+    if not isinstance(aspect, str) or not aspect.strip():
+        return jsonify({
+            "status": "error",
+            "error": {
+                "code": "INVALID_ASPECT",
+                "message": "Valid aspect is required."
+            }
+        }), 400
+
+    result = predict_sentiment(
+        text=text,
+        aspect=aspect
+    )
+
+    return jsonify({
+        "status": "success",
+        "data": {
+            "aspect": aspect,
+            "sentiment": result
+        }
+    }), 200
+.
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\sentiment-stance-service\modules\stance\models.py
+============================================================
+.
+.
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\sentiment-stance-service\modules\stance\processor.py
+============================================================
+.
+SUPPORT_WORDS = {
+    "support",
+    "supports",
+    "supported",
+    "agree",
+    "agrees",
+    "agreed",
+    "approve",
+    "approves",
+    "approved",
+    "beneficial",
+    "useful",
+    "helpful",
+    "good",
+    "great",
+    "excellent",
+    "positive"
+}
+
+
+AGAINST_WORDS = {
+    "against",
+    "oppose",
+    "opposes",
+    "opposed",
+    "disagree",
+    "disagrees",
+    "disagreed",
+    "reject",
+    "rejects",
+    "rejected",
+    "bad",
+    "poor",
+    "harmful",
+    "useless",
+    "negative"
+}
+
+
+def predict_stance(
+    text,
+    target
+):
+    """
+    Predict stance toward a target.
+
+    MVP implementation uses a keyword-based approach.
+
+    Later this will be replaced by a proper stance
+    detection model.
+    """
+
+    text_lower = text.lower()
+
+    support_count = sum(
+        1
+        for word in SUPPORT_WORDS
+        if word in text_lower
+    )
+
+    against_count = sum(
+        1
+        for word in AGAINST_WORDS
+        if word in text_lower
+    )
+
+    if support_count > against_count:
+
+        label = "support"
+
+        confidence = min(
+            0.60 + support_count * 0.08,
+            0.95
+        )
+
+    elif against_count > support_count:
+
+        label = "against"
+
+        confidence = min(
+            0.60 + against_count * 0.08,
+            0.95
+        )
+
+    else:
+
+        label = "neutral"
+        confidence = 0.60
+
+    return {
+        "target": target,
+        "label": label,
+        "confidence": round(
+            confidence,
+            2
+        )
+    }
+.
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\sentiment-stance-service\modules\stance\routes.py
+============================================================
+.
+from flask import Blueprint
+
+from .views import predict_stance_view
+
+
+stance_bp = Blueprint(
+    "stance",
+    __name__
+)
+
+
+stance_bp.route(
+    "/predict",
+    methods=["POST"]
+)(predict_stance_view)
+.
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\sentiment-stance-service\modules\stance\views.py
+============================================================
+.
+from flask import request, jsonify
+
+from .processor import predict_stance
+
+
+def predict_stance_view():
+    """
+    Handle stance prediction request.
+    """
+
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict):
+        return jsonify({
+            "status": "error",
+            "error": {
+                "code": "INVALID_INPUT",
+                "message": "Request body must be a JSON object."
+            }
+        }), 400
+
+    text = data.get("text")
+    target = data.get("target")
+
+    if not isinstance(text, str) or not text.strip():
+        return jsonify({
+            "status": "error",
+            "error": {
+                "code": "INVALID_TEXT",
+                "message": "Valid text is required."
+            }
+        }), 400
+
+    if not isinstance(target, str) or not target.strip():
+        return jsonify({
+            "status": "error",
+            "error": {
+                "code": "INVALID_TARGET",
+                "message": "Valid target is required."
+            }
+        }), 400
+
+    result = predict_stance(
+        text=text,
+        target=target
+    )
+
+    return jsonify({
+        "status": "success",
+        "data": {
+            "stance": result
+        }
+    }), 200
+.
+.

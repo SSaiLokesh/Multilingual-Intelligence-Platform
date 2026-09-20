@@ -1,0 +1,489 @@
+============================================================
+MULTILINGUAL INTELLIGENCE PLATFORM - PYTHON SNAPSHOT
+Generated: Sun 09/20/2026 18:36:45.65
+Root: D:\Projects\Capstone\Multilingual-Intelligence-Platform\bff
+============================================================
+
+
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\bff\app.py
+============================================================
+
+from flask import Flask
+
+from config import Config
+
+from modules.process.routes import process_bp
+from modules.results.routes import results_bp
+
+
+def create_app():
+    """
+    Create and configure the Flask application.
+    """
+
+    app = Flask(__name__)
+
+    # Load configuration
+    app.config.from_object(Config)
+
+    # Register blueprints
+    app.register_blueprint(
+        process_bp,
+        url_prefix=f"{Config.API_PREFIX}/process"
+    )
+
+    app.register_blueprint(
+        results_bp,
+        url_prefix=f"{Config.API_PREFIX}/results"
+    )
+
+    @app.get("/")
+    def home():
+        return {
+            "service": "bff",
+            "status": "running"
+        }
+
+    @app.get("/health")
+    def health():
+        return {
+            "service": "bff",
+            "status": "healthy"
+        }
+
+    return app
+
+
+app = create_app()
+
+
+if __name__ == "__main__":
+    app.run(
+        host="0.0.0.0",
+        port=8000,
+        debug=Config.DEBUG
+    )
+
+
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\bff\config.py
+============================================================
+
+import os
+
+
+class Config:
+    """
+    Application configuration for the BFF.
+    """
+
+    # Flask
+    DEBUG = os.getenv("DEBUG", "True").lower() == "true"
+
+    # API version
+    API_PREFIX = os.getenv("API_PREFIX", "/api/v1")
+
+    # Service URLs
+    MULTILINGUAL_ASPECT_SERVICE_URL = os.getenv(
+        "MULTILINGUAL_ASPECT_SERVICE_URL",
+        "http://localhost:8001"
+    )
+
+    SENTIMENT_STANCE_SERVICE_URL = os.getenv(
+        "SENTIMENT_STANCE_SERVICE_URL",
+        "http://localhost:8002"
+    )
+
+    ADAPTATION_SERVICE_URL = os.getenv(
+        "ADAPTATION_SERVICE_URL",
+        "http://localhost:8003"
+    )
+
+    # Request timeout in seconds
+    SERVICE_TIMEOUT = int(
+        os.getenv("SERVICE_TIMEOUT", "30")
+    )
+
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\bff\models\base_models.py
+============================================================
+.
+"""
+Base models for the BFF.
+
+The MVP does not require persistent database models yet.
+Service-specific request/response models are kept inside
+their respective modules.
+""".
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\bff\modules\process\models.py
+============================================================
+.
+class TextProcessRequest:
+    """
+    Represents a text processing request.
+    """
+
+    def __init__(self, text):
+        self.text = text
+
+    @classmethod
+    def from_dict(cls, data):
+        if not isinstance(data, dict):
+            raise ValueError("Request body must be a JSON object.")
+
+        text = data.get("text")
+
+        if text is None:
+            raise ValueError("Field 'text' is required.")
+
+        if not isinstance(text, str):
+            raise ValueError("Field 'text' must be a string.")
+
+        if not text.strip():
+            raise ValueError("Field 'text' cannot be empty.")
+
+        return cls(text=text.strip()).
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\bff\modules\process\routes.py
+============================================================
+.
+from flask import Blueprint
+
+from .views import process_text
+from .views import process_dataset
+
+
+process_bp = Blueprint(
+    "process",
+    __name__
+)
+
+
+process_bp.route(
+    "/text",
+    methods=["POST"]
+)(process_text)
+
+
+process_bp.route(
+    "/dataset",
+    methods=["POST"]
+)(process_dataset).
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\bff\modules\process\views.py
+============================================================
+.
+import uuid
+
+import requests
+from flask import request, jsonify, current_app
+
+from .models import TextProcessRequest
+
+
+def generate_request_id():
+    """
+    Generate a unique request ID for tracing
+    the request across services.
+    """
+
+    return f"req_{uuid.uuid4().hex[:8]}"
+
+
+def process_text():
+    """
+    Process a single text through all backend services.
+    """
+
+    request_id = generate_request_id()
+
+    try:
+        data = request.get_json(silent=True)
+
+        text_request = TextProcessRequest.from_dict(data)
+
+    except ValueError as error:
+        return jsonify({
+            "request_id": request_id,
+            "status": "error",
+            "error": {
+                "code": "INVALID_INPUT",
+                "message": str(error)
+            },
+            "metadata": {
+                "service": "bff"
+            }
+        }), 400
+
+    text = text_request.text
+
+    try:
+        # --------------------------------------------------
+        # STEP 1: Call Multilingual + Aspect Service
+        # --------------------------------------------------
+
+        service1_url = (
+            current_app.config["MULTILINGUAL_ASPECT_SERVICE_URL"]
+            + "/internal/v1/process"
+        )
+
+        service1_payload = {
+            "request_id": request_id,
+            "text": text
+        }
+
+        service1_response = requests.post(
+            service1_url,
+            json=service1_payload,
+            timeout=current_app.config["SERVICE_TIMEOUT"]
+        )
+
+        if service1_response.status_code != 200:
+            return jsonify({
+                "request_id": request_id,
+                "status": "error",
+                "error": {
+                    "code": "SERVICE_1_ERROR",
+                    "message": "Multilingual aspect service failed."
+                },
+                "details": service1_response.json()
+                if service1_response.content
+                else None
+            }), 502
+
+        service1_data = service1_response.json()
+
+        # --------------------------------------------------
+        # STEP 2: Call Sentiment + Stance Service
+        # --------------------------------------------------
+
+        service2_url = (
+            current_app.config["SENTIMENT_STANCE_SERVICE_URL"]
+            + "/internal/v1/analyze"
+        )
+
+        service2_payload = {
+            "request_id": request_id,
+            "text": service1_data["data"]["text"],
+            "language": service1_data["data"]["language"],
+            "aspects": service1_data["data"]["aspects"]
+        }
+
+        service2_response = requests.post(
+            service2_url,
+            json=service2_payload,
+            timeout=current_app.config["SERVICE_TIMEOUT"]
+        )
+
+        if service2_response.status_code != 200:
+            return jsonify({
+                "request_id": request_id,
+                "status": "error",
+                "error": {
+                    "code": "SERVICE_2_ERROR",
+                    "message": "Sentiment stance service failed."
+                },
+                "details": service2_response.json()
+                if service2_response.content
+                else None
+            }), 502
+
+        service2_data = service2_response.json()
+
+        # --------------------------------------------------
+        # STEP 3: Call Adaptation Service
+        # --------------------------------------------------
+
+        service3_url = (
+            current_app.config["ADAPTATION_SERVICE_URL"]
+            + "/internal/v1/adapt"
+        )
+
+        service3_payload = {
+            "request_id": request_id,
+            "data": {
+                "text": service1_data["data"]["text"],
+                "language": service1_data["data"]["language"],
+                "predictions": service2_data["predictions"]
+            }
+        }
+
+        service3_response = requests.post(
+            service3_url,
+            json=service3_payload,
+            timeout=current_app.config["SERVICE_TIMEOUT"]
+        )
+
+        if service3_response.status_code != 200:
+            return jsonify({
+                "request_id": request_id,
+                "status": "error",
+                "error": {
+                    "code": "SERVICE_3_ERROR",
+                    "message": "Adaptation service failed."
+                },
+                "details": service3_response.json()
+                if service3_response.content
+                else None
+            }), 502
+
+        service3_data = service3_response.json()
+
+        # --------------------------------------------------
+        # STEP 4: Aggregate final response
+        # --------------------------------------------------
+
+        final_response = {
+            "request_id": request_id,
+            "status": "success",
+            "data": {
+                "text": service1_data["data"]["text"],
+                "language": service1_data["data"]["language"],
+                "predictions": service2_data["predictions"]
+            },
+            "processing": {
+                "adaptation_status": service3_data[
+                    "adaptation"
+                ]["action"]
+            }
+        }
+
+        return jsonify(final_response), 200
+
+    except requests.exceptions.Timeout:
+
+        return jsonify({
+            "request_id": request_id,
+            "status": "error",
+            "error": {
+                "code": "SERVICE_TIMEOUT",
+                "message": "One of the backend services timed out."
+            }
+        }), 504
+
+    except requests.exceptions.ConnectionError:
+
+        return jsonify({
+            "request_id": request_id,
+            "status": "error",
+            "error": {
+                "code": "SERVICE_UNAVAILABLE",
+                "message": "Unable to connect to a backend service."
+            }
+        }), 503
+
+    except Exception as error:
+
+        return jsonify({
+            "request_id": request_id,
+            "status": "error",
+            "error": {
+                "code": "INTERNAL_ERROR",
+                "message": str(error)
+            }
+        }), 500
+
+
+def process_dataset():
+    """
+    Dataset processing endpoint.
+
+    Dataset processing will be implemented after
+    the text-processing pipeline is completed.
+    """
+
+    request_id = generate_request_id()
+
+    return jsonify({
+        "request_id": request_id,
+        "status": "success",
+        "message": "Dataset processing endpoint is available.",
+        "data": {
+            "status": "not_implemented"
+        }
+    }), 200.
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\bff\modules\results\models.py
+============================================================
+.
+"""
+Models for the results module.
+
+Persistent result storage will be added when the
+storage implementation is introduced.
+""".
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\bff\modules\results\routes.py
+============================================================
+.
+from flask import Blueprint
+
+from .views import get_result
+from .views import get_results
+
+
+results_bp = Blueprint(
+    "results",
+    __name__
+)
+
+
+results_bp.route(
+    "/<result_id>",
+    methods=["GET"]
+)(get_result)
+
+
+results_bp.route(
+    "",
+    methods=["GET"]
+)(get_results).
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\bff\modules\results\views.py
+============================================================
+.
+from flask import jsonify
+
+
+def get_result(result_id):
+    """
+    Retrieve a single processing result.
+
+    Persistent result storage will be implemented later.
+    """
+
+    return jsonify({
+        "status": "success",
+        "result_id": result_id,
+        "message": "Result retrieval will be connected to storage."
+    }), 200
+
+
+def get_results():
+    """
+    Retrieve processing results.
+
+    Persistent result storage will be implemented later.
+    """
+
+    return jsonify({
+        "status": "success",
+        "results": [],
+        "message": "Result listing will be connected to storage."
+    }), 200.
+.

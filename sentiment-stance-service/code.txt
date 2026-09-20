@@ -1,0 +1,679 @@
+Next is **Service 2 — Sentiment + Stance Service**.
+
+This will be a completely isolated Flask microservice. It will run independently on **port 8002** and will communicate with the BFF only through HTTP.
+
+Its responsibility is strictly:
+
+```text
+Input from BFF
+      │
+      ▼
+┌───────────────────────┐
+│ Sentiment Analysis    │
+│                       │
+│ Positive              │
+│ Negative              │
+│ Neutral               │
+└──────────┬────────────┘
+           │
+           ▼
+┌───────────────────────┐
+│ Stance Detection      │
+│                       │
+│ Support               │
+│ Against               │
+│ Neutral               │
+└──────────┬────────────┘
+           │
+           ▼
+      JSON Response
+```
+
+It will **not** import anything from Service 1, Service 3, or the BFF.
+
+---
+
+# 1. Final Service 2 structure
+
+Use:
+
+```text
+sentiment-stance-service/
+│
+├── app.py
+├── config.py
+│
+├── models/
+│   └── base_models.py
+│
+├── modules/
+│   │
+│   ├── process/
+│   │   ├── routes.py
+│   │   ├── views.py
+│   │   └── processor.py
+│   │
+│   ├── sentiment/
+│   │   ├── routes.py
+│   │   ├── views.py
+│   │   └── processor.py
+│   │
+│   └── stance/
+│       ├── routes.py
+│       ├── views.py
+│       └── processor.py
+│
+├── requirements.txt
+└── README.md
+```
+
+The structure follows exactly the same principle we established:
+
+```text
+module
+ ├── routes.py
+ ├── views.py
+ └── processor.py
+```
+
+`routes.py` → Flask route
+`views.py` → input/output handling
+`processor.py` → actual processing logic
+
+---
+
+# 2. `sentiment-stance-service/config.py`
+
+```python
+import os
+
+
+class Config:
+    """
+    Configuration for the Sentiment + Stance Service.
+    """
+
+    DEBUG = os.getenv(
+        "DEBUG",
+        "True"
+    ).lower() == "true"
+
+    SERVICE_NAME = "sentiment-stance-service"
+
+    SERVICE_VERSION = os.getenv(
+        "SERVICE_VERSION",
+        "1.0.0"
+    )
+
+    API_PREFIX = os.getenv(
+        "API_PREFIX",
+        "/internal/v1"
+    )
+
+    PORT = int(
+        os.getenv(
+            "PORT",
+            "8002"
+        )
+    )
+```
+
+Again, there is no physical `v1` directory.
+
+The API version is configuration:
+
+```text
+/internal/v1
+```
+
+---
+
+# 3. `sentiment-stance-service/app.py`
+
+```python
+from flask import Flask
+
+from config import Config
+
+from modules.process.routes import process_bp
+from modules.sentiment.routes import sentiment_bp
+from modules.stance.routes import stance_bp
+
+
+def create_app():
+    """
+    Create and configure the Flask application.
+    """
+
+    app = Flask(__name__)
+
+    app.config.from_object(Config)
+
+    # -----------------------------------------
+    # Main processing endpoint
+    # -----------------------------------------
+
+    app.register_blueprint(
+        process_bp,
+        url_prefix=f"{Config.API_PREFIX}/analyze"
+    )
+
+    # -----------------------------------------
+    # Individual sentiment endpoint
+    # -----------------------------------------
+
+    app.register_blueprint(
+        sentiment_bp,
+        url_prefix=f"{Config.API_PREFIX}/sentiment"
+    )
+
+    # -----------------------------------------
+    # Individual stance endpoint
+    # -----------------------------------------
+
+    app.register_blueprint(
+        stance_bp,
+        url_prefix=f"{Config.API_PREFIX}/stance"
+    )
+
+    # -----------------------------------------
+    # Service information
+    # -----------------------------------------
+
+    @app.get("/")
+    def home():
+        return {
+            "service": Config.SERVICE_NAME,
+            "version": Config.SERVICE_VERSION,
+            "status": "running"
+        }
+
+    # -----------------------------------------
+    # Health check
+    # -----------------------------------------
+
+    @app.get("/health")
+    def health():
+        return {
+            "service": Config.SERVICE_NAME,
+            "status": "healthy"
+        }
+
+    return app
+
+
+app = create_app()
+
+
+if __name__ == "__main__":
+    app.run(
+        host="0.0.0.0",
+        port=Config.PORT,
+        debug=Config.DEBUG
+    )
+```
+
+This gives us:
+
+```text
+GET  /
+GET  /health
+
+POST /internal/v1/analyze
+POST /internal/v1/sentiment/predict
+POST /internal/v1/stance/predict
+```
+
+---
+
+# 4. `models/base_models.py`
+
+These are service-level models only.
+
+```python
+class PredictionConfidence:
+    """
+    Represents a prediction label and confidence.
+    """
+
+    def __init__(
+        self,
+        label,
+        confidence
+    ):
+        self.label = label
+        self.confidence = confidence
+
+    def to_dict(self):
+        return {
+            "label": self.label,
+            "confidence": self.confidence
+        }
+
+
+class Prediction:
+    """
+    Represents the combined sentiment and stance
+    prediction for an aspect.
+    """
+
+    def __init__(
+        self,
+        aspect,
+        category,
+        sentiment,
+        stance
+    ):
+        self.aspect = aspect
+        self.category = category
+        self.sentiment = sentiment
+        self.stance = stance
+
+    def to_dict(self):
+        return {
+            "aspect": self.aspect,
+            "category": self.category,
+            "sentiment": self.sentiment,
+            "stance": self.stance
+        }
+```
+
+No other service uses these classes.
+
+---
+
+# 5. Sentiment module
+
+Structure:
+
+```text
+modules/sentiment/
+│
+├── routes.py
+├── views.py
+└── processor.py
+```
+
+The sentiment module owns:
+
+```text
+aspect + text
+       ↓
+sentiment
+       ↓
+positive / negative / neutral
+       ↓
+confidence
+```
+
+---
+
+# 6. `modules/sentiment/routes.py`
+
+```python
+from flask import Blueprint
+
+from .views import predict_sentiment
+
+
+sentiment_bp = Blueprint(
+    "sentiment",
+    __name__
+)
+
+
+sentiment_bp.route(
+    "/predict",
+    methods=["POST"]
+)(predict_sentiment)
+```
+
+---
+
+# 7. `modules/sentiment/processor.py`
+
+For the MVP, we will use a simple placeholder rule-based processor.
+
+Later this exact file can be replaced with the actual multilingual Transformer model.
+
+```python
+POSITIVE_WORDS = {
+    "excellent",
+    "good",
+    "great",
+    "amazing",
+    "awesome",
+    "fantastic",
+    "love",
+    "loved",
+    "best",
+    "perfect",
+    "nice",
+    "wonderful",
+    "satisfied",
+    "smooth",
+    "fast",
+    "reliable"
+}
+
+
+NEGATIVE_WORDS = {
+    "bad",
+    "poor",
+    "terrible",
+    "horrible",
+    "worst",
+    "hate",
+    "hated",
+    "slow",
+    "expensive",
+    "problem",
+    "problems",
+    "issue",
+    "issues",
+    "disappointing",
+    "disappointed",
+    "broken",
+    "weak"
+}
+
+
+def predict_sentiment(
+    text,
+    aspect
+):
+    """
+    Predict sentiment for a given aspect.
+
+    MVP implementation uses a simple keyword-based
+    approach. This will later be replaced by the
+    actual multilingual ML model.
+    """
+
+    text_lower = text.lower()
+
+    positive_count = sum(
+        1
+        for word in POSITIVE_WORDS
+        if word in text_lower
+    )
+
+    negative_count = sum(
+        1
+        for word in NEGATIVE_WORDS
+        if word in text_lower
+    )
+
+    if positive_count > negative_count:
+        label = "positive"
+
+        confidence = min(
+            0.60 + positive_count * 0.08,
+            0.95
+        )
+
+    elif negative_count > positive_count:
+        label = "negative"
+
+        confidence = min(
+            0.60 + negative_count * 0.08,
+            0.95
+        )
+
+    else:
+        label = "neutral"
+        confidence = 0.60
+
+    return {
+        "label": label,
+        "confidence": round(
+            confidence,
+            2
+        )
+    }
+```
+
+### Important
+
+This is only an MVP placeholder.
+
+It is **not** the final ABSA sentiment model.
+
+Later this processor can become something like:
+
+```text
+XLM-R
+   ↓
+Aspect-aware representation
+   ↓
+Sentiment classifier
+   ↓
+Positive / Negative / Neutral
+```
+
+without changing the external API.
+
+---
+
+# 8. `modules/sentiment/views.py`
+
+```python
+from flask import request, jsonify
+
+from .processor import predict_sentiment
+
+
+def predict_sentiment_view():
+    """
+    Handle sentiment prediction request.
+    """
+
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict):
+        return jsonify({
+            "status": "error",
+            "error": {
+                "code": "INVALID_INPUT",
+                "message": "Request body must be a JSON object."
+            }
+        }), 400
+
+    text = data.get("text")
+    aspect = data.get("aspect")
+
+    if not isinstance(text, str) or not text.strip():
+        return jsonify({
+            "status": "error",
+            "error": {
+                "code": "INVALID_TEXT",
+                "message": "Valid text is required."
+            }
+        }), 400
+
+    if not isinstance(aspect, str) or not aspect.strip():
+        return jsonify({
+            "status": "error",
+            "error": {
+                "code": "INVALID_ASPECT",
+                "message": "Valid aspect is required."
+            }
+        }), 400
+
+    result = predict_sentiment(
+        text=text,
+        aspect=aspect
+    )
+
+    return jsonify({
+        "status": "success",
+        "data": {
+            "aspect": aspect,
+            "sentiment": result
+        }
+    }), 200
+```
+
+We need to make sure the route points to the correct function name.
+
+So change `routes.py` to:
+
+```python
+```
+
+---
+
+# 9. Stance module
+
+Structure:
+
+```text
+modules/stance/
+│
+├── routes.py
+├── views.py
+└── processor.py
+```
+
+The stance module is **independent of sentiment**.
+
+This is important for your research architecture.
+
+We should not implement:
+
+```text
+sentiment = positive
+        ↓
+stance = support
+```
+
+as a hard-coded relationship.
+
+Instead:
+
+```text
+                 ┌──► Sentiment
+Text + Aspect ───┤
+                 └──► Stance
+```
+
+They are separate predictions.
+
+---
+
+# 10. `modules/stance/routes.py`
+
+```python
+```
+
+---
+
+# 11. `modules/stance/processor.py`
+
+```python
+```
+
+---
+
+# 12. `modules/stance/views.py`
+
+```python
+```
+
+---
+
+# 13. Process module
+
+This is the endpoint that the BFF will actually use:
+
+```text
+POST /internal/v1/analyze
+```
+
+The individual sentiment and stance endpoints are useful for testing, but the BFF should call the **main analyze endpoint**.
+
+Structure:
+
+```text
+modules/process/
+│
+├── routes.py
+├── views.py
+└── processor.py
+```
+
+---
+
+# 14. `modules/process/routes.py`
+
+```python
+```
+
+Because `app.py` registers this blueprint as:
+
+```text
+/internal/v1/analyze
+```
+
+the final route becomes:
+
+```text
+POST /internal/v1/analyze
+```
+
+---
+
+# 15. `modules/process/processor.py`
+
+This is the internal orchestration of Service 2.
+
+```python
+```
+
+Notice something important:
+
+```text
+language
+```
+
+is accepted by the processor even though the placeholder implementation doesn't currently use it.
+
+That is intentional.
+
+Later, our multilingual model will need the language/context information.
+
+---
+
+# 16. `modules/process/views.py`
+
+```python
+```
+
+---
+
+# 17. `requirements.txt`
+
+At this stage:
+
+```text
+
+```
+
+That's enough.
+
+Later, when we replace the processors with the actual ML implementation, we'll add the required libraries.
+
+---
+
+# 18. `README.md`
+
+````markdown
+```
+
+````
+
+---
+
+# 19. Final Service 2 structure
+
+The next service after this is **Service 3 — Adaptation Service**, which will remain deliberately simple for the MVP: receiving the processed predictions, integrating/storing them, maintaining historical records/version information, and returning the adaptation/storage status.

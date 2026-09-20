@@ -1,0 +1,905 @@
+============================================================
+MULTILINGUAL INTELLIGENCE PLATFORM - PYTHON SNAPSHOT
+Generated: Sun 09/20/2026 18:40:58.25
+Root: D:\Projects\Capstone\Multilingual-Intelligence-Platform\multilingual-aspect-service
+============================================================
+
+
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\multilingual-aspect-service\app.py
+============================================================
+
+from flask import Flask
+
+from config import Config
+
+from modules.process.routes import process_bp
+from modules.preprocessing.routes import preprocessing_bp
+from modules.language_detection.routes import language_detection_bp
+from modules.aspect_extraction.routes import aspect_extraction_bp
+from modules.aspect_categorization.routes import aspect_categorization_bp
+
+
+def create_app():
+
+    app = Flask(__name__)
+
+    app.config.from_object(Config)
+
+    # Main pipeline
+    app.register_blueprint(
+        process_bp,
+        url_prefix=f"{Config.API_PREFIX}/process"
+    )
+
+    # Individual modules
+    app.register_blueprint(
+        preprocessing_bp,
+        url_prefix=f"{Config.API_PREFIX}/preprocessing"
+    )
+
+    app.register_blueprint(
+        language_detection_bp,
+        url_prefix=f"{Config.API_PREFIX}/language"
+    )
+
+    app.register_blueprint(
+        aspect_extraction_bp,
+        url_prefix=f"{Config.API_PREFIX}/aspect"
+    )
+
+    app.register_blueprint(
+        aspect_categorization_bp,
+        url_prefix=f"{Config.API_PREFIX}/aspect"
+    )
+
+    @app.get("/")
+    def home():
+        return {
+            "service": Config.SERVICE_NAME,
+            "version": Config.SERVICE_VERSION,
+            "status": "running"
+        }
+
+    @app.get("/health")
+    def health():
+        return {
+            "service": Config.SERVICE_NAME,
+            "status": "healthy"
+        }
+
+    return app
+
+
+app = create_app()
+
+
+if __name__ == "__main__":
+    app.run(
+        host="0.0.0.0",
+        port=Config.PORT,
+        debug=Config.DEBUG
+    )
+
+
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\multilingual-aspect-service\config.py
+============================================================
+
+import os
+
+
+class Config:
+    """
+    Configuration for the Multilingual + Aspect Service.
+    """
+
+    DEBUG = os.getenv("DEBUG", "True").lower() == "true"
+
+    SERVICE_NAME = "multilingual-aspect-service"
+
+    SERVICE_VERSION = os.getenv(
+        "SERVICE_VERSION",
+        "1.0.0"
+    )
+
+    API_PREFIX = os.getenv(
+        "API_PREFIX",
+        "/internal/v1"
+    )
+
+    PORT = int(
+        os.getenv("PORT", "8001")
+    )
+
+
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\multilingual-aspect-service\pipeline.py
+============================================================
+
+from modules.preprocessing.views import preprocess_text
+from modules.language_detection.views import detect_language
+from modules.aspect_extraction.views import extract_aspects
+from modules.aspect_categorization.views import categorize_aspects
+
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\multilingual-aspect-service\models\base_models.py
+============================================================
+.
+class LanguageInfo:
+    """
+    Represents detected language information.
+    """
+
+    def __init__(
+        self,
+        name,
+        code,
+        confidence
+    ):
+        self.name = name
+        self.code = code
+        self.confidence = confidence
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "code": self.code,
+            "confidence": self.confidence
+        }
+
+
+class AspectInfo:
+    """
+    Represents an extracted aspect.
+    """
+
+    def __init__(
+        self,
+        text,
+        category=None
+    ):
+        self.text = text
+        self.category = category
+
+    def to_dict(self):
+        data = {
+            "text": self.text
+        }
+
+        if self.category is not None:
+            data["category"] = self.category
+
+        return data.
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\multilingual-aspect-service\modules\aspect_categorization\routes.py
+============================================================
+.
+from flask import Blueprint
+
+from .views import categorize_aspects
+
+
+aspect_categorization_bp = Blueprint(
+    "aspect_categorization",
+    __name__
+)
+
+
+aspect_categorization_bp.route(
+    "/categorize",
+    methods=["POST"]
+)(categorize_aspects).
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\multilingual-aspect-service\modules\aspect_categorization\views.py
+============================================================
+.
+from flask import request, jsonify
+
+
+CATEGORY_MAPPING = {
+    "camera": "Camera",
+    "camera quality": "Camera",
+    "battery": "Battery",
+    "battery life": "Battery",
+    "screen": "Display",
+    "display": "Display",
+    "display quality": "Display",
+    "performance": "Performance",
+    "speed": "Performance",
+    "processor": "Performance",
+    "price": "Price",
+    "cost": "Price",
+    "design": "Design",
+    "build": "Build Quality",
+    "build quality": "Build Quality",
+    "software": "Software",
+    "audio": "Audio",
+    "speaker": "Audio",
+    "speakers": "Audio"
+}
+
+
+def categorize_aspects():
+    """
+    Categorize extracted aspects.
+    """
+
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict):
+        return jsonify({
+            "status": "error",
+            "error": {
+                "code": "INVALID_INPUT",
+                "message": "Request body must be a JSON object."
+            }
+        }), 400
+
+    aspects = data.get("aspects")
+
+    if not isinstance(aspects, list):
+        return jsonify({
+            "status": "error",
+            "error": {
+                "code": "INVALID_ASPECTS",
+                "message": "Field 'aspects' must be a list."
+            }
+        }), 400
+
+    categorized_aspects = []
+
+    for aspect in aspects:
+
+        if isinstance(aspect, str):
+            aspect_text = aspect.strip()
+
+        elif isinstance(aspect, dict):
+            aspect_text = aspect.get("text", "").strip()
+
+        else:
+            continue
+
+        if not aspect_text:
+            continue
+
+        category = CATEGORY_MAPPING.get(
+            aspect_text.lower(),
+            "Other"
+        )
+
+        categorized_aspects.append({
+            "text": aspect_text,
+            "category": category
+        })
+
+    return jsonify({
+        "status": "success",
+        "data": {
+            "aspects": categorized_aspects
+        }
+    }), 200.
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\multilingual-aspect-service\modules\aspect_extraction\routes.py
+============================================================
+.
+from flask import Blueprint
+
+from .views import extract_aspects
+
+
+aspect_extraction_bp = Blueprint(
+    "aspect_extraction",
+    __name__
+)
+
+
+aspect_extraction_bp.route(
+    "/extract",
+    methods=["POST"]
+)(extract_aspects).
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\multilingual-aspect-service\modules\aspect_extraction\views.py
+============================================================
+.
+from flask import request, jsonify
+
+
+# Temporary MVP aspect vocabulary
+ASPECT_KEYWORDS = {
+    "camera": "Camera",
+    "camera quality": "Camera",
+    "battery": "Battery",
+    "battery life": "Battery",
+    "screen": "Display",
+    "display": "Display",
+    "display quality": "Display",
+    "performance": "Performance",
+    "speed": "Performance",
+    "processor": "Performance",
+    "price": "Price",
+    "cost": "Price",
+    "design": "Design",
+    "build": "Build Quality",
+    "build quality": "Build Quality",
+    "software": "Software",
+    "software experience": "Software",
+    "audio": "Audio",
+    "speaker": "Audio",
+    "speakers": "Audio"
+}
+
+
+def extract_aspects():
+    """
+    Extract aspects from the supplied text.
+
+    MVP implementation uses a keyword-based approach.
+    """
+
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict):
+        return jsonify({
+            "status": "error",
+            "error": {
+                "code": "INVALID_INPUT",
+                "message": "Request body must be a JSON object."
+            }
+        }), 400
+
+    text = data.get("text")
+
+    if not isinstance(text, str) or not text.strip():
+        return jsonify({
+            "status": "error",
+            "error": {
+                "code": "INVALID_TEXT",
+                "message": "Valid text is required."
+            }
+        }), 400
+
+    text_lower = text.lower()
+
+    found_aspects = []
+
+    # Sort by length so that
+    # "battery life" is checked before "battery".
+    keywords = sorted(
+        ASPECT_KEYWORDS.items(),
+        key=lambda item: len(item[0]),
+        reverse=True
+    )
+
+    for keyword, category in keywords:
+
+        if keyword in text_lower:
+
+            already_exists = any(
+                aspect["text"].lower() == keyword
+                for aspect in found_aspects
+            )
+
+            if not already_exists:
+                found_aspects.append({
+                    "text": keyword,
+                    "category": category
+                })
+
+    return jsonify({
+        "status": "success",
+        "data": {
+            "aspects": found_aspects
+        }
+    }), 200.
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\multilingual-aspect-service\modules\language_detection\routes.py
+============================================================
+.
+from flask import Blueprint
+
+from .views import detect_language
+
+
+language_detection_bp = Blueprint(
+    "language_detection",
+    __name__
+)
+
+
+language_detection_bp.route(
+    "/detect",
+    methods=["POST"]
+)(detect_language).
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\multilingual-aspect-service\modules\language_detection\views.py
+============================================================
+.
+from flask import request, jsonify
+
+
+def detect_language():
+    """
+    Detect the language of the supplied text.
+
+    MVP implementation uses a simple heuristic.
+    This will later be replaced with a proper
+    multilingual language detection model.
+    """
+
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict):
+        return jsonify({
+            "status": "error",
+            "error": {
+                "code": "INVALID_INPUT",
+                "message": "Request body must be a JSON object."
+            }
+        }), 400
+
+    text = data.get("text")
+
+    if not isinstance(text, str) or not text.strip():
+        return jsonify({
+            "status": "error",
+            "error": {
+                "code": "INVALID_TEXT",
+                "message": "Valid text is required."
+            }
+        }), 400
+
+    text = text.strip()
+
+    # -----------------------------------------
+    # Simple MVP language heuristic
+    # -----------------------------------------
+
+    if any(
+        "\u0900" <= char <= "\u097F"
+        for char in text
+    ):
+        language = {
+            "name": "Hindi",
+            "code": "hi",
+            "confidence": 0.90
+        }
+
+    elif any(
+        "\u0C00" <= char <= "\u0C7F"
+        for char in text
+    ):
+        language = {
+            "name": "Telugu",
+            "code": "te",
+            "confidence": 0.90
+        }
+
+    elif any(
+        "\u4E00" <= char <= "\u9FFF"
+        for char in text
+    ):
+        language = {
+            "name": "Chinese",
+            "code": "zh",
+            "confidence": 0.90
+        }
+
+    elif any(
+        "\u3040" <= char <= "\u30FF"
+        for char in text
+    ):
+        language = {
+            "name": "Japanese",
+            "code": "ja",
+            "confidence": 0.90
+        }
+
+    else:
+        language = {
+            "name": "English",
+            "code": "en",
+            "confidence": 0.80
+        }
+
+    return jsonify({
+        "status": "success",
+        "data": {
+            "language": language
+        }
+    }), 200.
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\multilingual-aspect-service\modules\preprocessing\processor.py
+============================================================
+.
+import re
+
+
+def process_text(text):
+    """
+    Perform basic text preprocessing.
+    """
+
+    processed_text = text.strip()
+
+    processed_text = re.sub(
+        r"<[^>]+>",
+        " ",
+        processed_text
+    )
+
+    processed_text = re.sub(
+        r"\s+",
+        " ",
+        processed_text
+    )
+
+    return processed_text.strip().
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\multilingual-aspect-service\modules\preprocessing\routes.py
+============================================================
+.
+from flask import Blueprint
+
+from .views import preprocess_text
+
+
+preprocessing_bp = Blueprint(
+    "preprocessing",
+    __name__
+)
+
+
+preprocessing_bp.route(
+    "/process",
+    methods=["POST"]
+)(preprocess_text).
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\multilingual-aspect-service\modules\preprocessing\views.py
+============================================================
+.
+
+from flask import request, jsonify
+
+from .processor import process_text
+
+
+def preprocess_text():
+
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict):
+        return jsonify({
+            "status": "error",
+            "error": {
+                "code": "INVALID_INPUT",
+                "message": "Request body must be a JSON object."
+            }
+        }), 400
+
+    text = data.get("text")
+
+    if text is None:
+        return jsonify({
+            "status": "error",
+            "error": {
+                "code": "MISSING_TEXT",
+                "message": "Field 'text' is required."
+            }
+        }), 400
+
+    if not isinstance(text, str):
+        return jsonify({
+            "status": "error",
+            "error": {
+                "code": "INVALID_TEXT",
+                "message": "Field 'text' must be a string."
+            }
+        }), 400
+
+    if not text.strip():
+        return jsonify({
+            "status": "error",
+            "error": {
+                "code": "EMPTY_TEXT",
+                "message": "Text cannot be empty."
+            }
+        }), 400
+
+    processed_text = process_text(text)
+
+    return jsonify({
+        "status": "success",
+        "data": {
+            "original_text": text,
+            "processed_text": processed_text
+        }
+    }), 200.
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\multilingual-aspect-service\modules\process\processor.py
+============================================================
+.
+from modules.preprocessing.processor import process_text
+
+
+def process_pipeline(text):
+    """
+    Execute the complete Multilingual + Aspect pipeline.
+
+    Pipeline:
+        preprocessing
+        -> language detection
+        -> aspect extraction
+        -> aspect categorization
+    """
+
+    processed_text = process_text(text)
+
+    # -----------------------------------------
+    # Language detection
+    # -----------------------------------------
+
+    language = detect_language(processed_text)
+
+    # -----------------------------------------
+    # Aspect extraction
+    # -----------------------------------------
+
+    aspects = extract_aspects(processed_text)
+
+    # -----------------------------------------
+    # Aspect categorization
+    # -----------------------------------------
+
+    aspects = categorize_aspects(aspects)
+
+    return {
+        "text": processed_text,
+        "language": language,
+        "aspects": aspects
+    }
+
+
+def detect_language(text):
+
+    if any(
+        "\u0900" <= char <= "\u097F"
+        for char in text
+    ):
+        return {
+            "name": "Hindi",
+            "code": "hi",
+            "confidence": 0.90
+        }
+
+    elif any(
+        "\u0C00" <= char <= "\u0C7F"
+        for char in text
+    ):
+        return {
+            "name": "Telugu",
+            "code": "te",
+            "confidence": 0.90
+        }
+
+    elif any(
+        "\u4E00" <= char <= "\u9FFF"
+        for char in text
+    ):
+        return {
+            "name": "Chinese",
+            "code": "zh",
+            "confidence": 0.90
+        }
+
+    elif any(
+        "\u3040" <= char <= "\u30FF"
+        for char in text
+    ):
+        return {
+            "name": "Japanese",
+            "code": "ja",
+            "confidence": 0.90
+        }
+
+    return {
+        "name": "English",
+        "code": "en",
+        "confidence": 0.80
+    }
+
+
+def extract_aspects(text):
+
+    aspect_keywords = {
+        "camera quality": "Camera",
+        "camera": "Camera",
+        "battery life": "Battery",
+        "battery": "Battery",
+        "display quality": "Display",
+        "display": "Display",
+        "screen": "Display",
+        "performance": "Performance",
+        "processor": "Performance",
+        "speed": "Performance",
+        "price": "Price",
+        "cost": "Price",
+        "design": "Design",
+        "build quality": "Build Quality",
+        "build": "Build Quality",
+        "software": "Software",
+        "speaker": "Audio",
+        "speakers": "Audio",
+        "audio": "Audio"
+    }
+
+    text_lower = text.lower()
+
+    aspects = []
+
+    for keyword, category in sorted(
+        aspect_keywords.items(),
+        key=lambda item: len(item[0]),
+        reverse=True
+    ):
+
+        if keyword in text_lower:
+
+            if not any(
+                aspect["text"] == keyword
+                for aspect in aspects
+            ):
+                aspects.append({
+                    "text": keyword,
+                    "category": category
+                })
+
+    return aspects
+
+
+def categorize_aspects(aspects):
+
+    for aspect in aspects:
+
+        if not aspect.get("category"):
+            aspect["category"] = "Other"
+
+    return aspects.
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\multilingual-aspect-service\modules\process\routes.py
+============================================================
+.
+from flask import Blueprint
+
+from .views import process
+
+
+process_bp = Blueprint(
+    "process",
+    __name__
+)
+
+
+process_bp.route(
+    "",
+    methods=["POST"]
+)(process).
+.
+.
+============================================================
+FILE: D:\Projects\Capstone\Multilingual-Intelligence-Platform\multilingual-aspect-service\modules\process\views.py
+============================================================
+.
+from flask import request, jsonify
+
+from .processor import process_pipeline
+
+
+def process():
+
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict):
+        return jsonify({
+            "request_id": None,
+            "status": "error",
+            "error": {
+                "code": "INVALID_INPUT",
+                "message": "Request body must be a JSON object."
+            },
+            "metadata": {
+                "service": "multilingual-aspect-service"
+            }
+        }), 400
+
+    request_id = data.get("request_id")
+
+    text = data.get("text")
+
+    if not request_id:
+        return jsonify({
+            "request_id": None,
+            "status": "error",
+            "error": {
+                "code": "MISSING_REQUEST_ID",
+                "message": "Field 'request_id' is required."
+            }
+        }), 400
+
+    if not isinstance(text, str):
+        return jsonify({
+            "request_id": request_id,
+            "status": "error",
+            "error": {
+                "code": "INVALID_TEXT",
+                "message": "Field 'text' must be a string."
+            },
+            "metadata": {
+                "service": "multilingual-aspect-service"
+            }
+        }), 400
+
+    if not text.strip():
+        return jsonify({
+            "request_id": request_id,
+            "status": "error",
+            "error": {
+                "code": "EMPTY_TEXT",
+                "message": "Text cannot be empty."
+            },
+            "metadata": {
+                "service": "multilingual-aspect-service"
+            }
+        }), 400
+
+    try:
+
+        result = process_pipeline(text)
+
+        return jsonify({
+            "request_id": request_id,
+            "status": "success",
+            "data": result,
+            "metadata": {
+                "service": "multilingual-aspect-service",
+                "service_version": "1.0.0"
+            }
+        }), 200
+
+    except Exception as error:
+
+        return jsonify({
+            "request_id": request_id,
+            "status": "error",
+            "error": {
+                "code": "PROCESSING_ERROR",
+                "message": str(error)
+            },
+            "metadata": {
+                "service": "multilingual-aspect-service"
+            }
+        }), 500.
+.
