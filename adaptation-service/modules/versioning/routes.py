@@ -2,7 +2,7 @@ from flask import Blueprint
 
 from .views import (
     get_current_version,
-    get_versions
+    get_version_history
 )
 
 
@@ -23,4 +23,4 @@ versioning_bp.route(
 versioning_bp.route(
     "/history",
     methods=["GET"]
-)(get_versions)
+)(get_version_history)
