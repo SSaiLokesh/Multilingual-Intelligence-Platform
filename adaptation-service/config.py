@@ -1,81 +1,69 @@
-from flask import Flask
-
-from config import Config
-
-from modules.data_integration.routes import data_integration_bp
-from modules.memory.routes import memory_bp
-from modules.versioning.routes import versioning_bp
+import os
 
 
-def create_app():
+class Config:
     """
-    Create and configure the Adaptation Service Flask application.
+    Configuration for the Adaptation Service.
     """
 
-    app = Flask(__name__)
-
-    # Load configuration
-    app.config.from_object(Config)
-
     # -----------------------------------------
-    # Data Integration
+    # Flask
     # -----------------------------------------
 
-    app.register_blueprint(
-        data_integration_bp,
-        url_prefix=f"{Config.API_PREFIX}/data"
-    )
-
-    # -----------------------------------------
-    # Memory
-    # -----------------------------------------
-
-    app.register_blueprint(
-        memory_bp,
-        url_prefix=f"{Config.API_PREFIX}/memory"
-    )
-
-    # -----------------------------------------
-    # Versioning
-    # -----------------------------------------
-
-    app.register_blueprint(
-        versioning_bp,
-        url_prefix=f"{Config.API_PREFIX}/version"
-    )
+    DEBUG = os.getenv(
+        "DEBUG",
+        "True"
+    ).lower() == "true"
 
     # -----------------------------------------
     # Service information
     # -----------------------------------------
 
-    @app.get("/")
-    def home():
-        return {
-            "service": Config.SERVICE_NAME,
-            "version": Config.SERVICE_VERSION,
-            "status": "running"
-        }
+    SERVICE_NAME = "adaptation-service"
+
+    SERVICE_VERSION = os.getenv(
+        "SERVICE_VERSION",
+        "1.0.0"
+    )
 
     # -----------------------------------------
-    # Health check
+    # API
     # -----------------------------------------
 
-    @app.get("/health")
-    def health():
-        return {
-            "service": Config.SERVICE_NAME,
-            "status": "healthy"
-        }
+    API_PREFIX = os.getenv(
+        "API_PREFIX",
+        "/internal/v1"
+    )
 
-    return app
+    # -----------------------------------------
+    # Server
+    # -----------------------------------------
 
+    PORT = int(
+        os.getenv(
+            "PORT",
+            "8003"
+        )
+    )
 
-app = create_app()
+    # -----------------------------------------
+    # MVP memory configuration
+    # -----------------------------------------
 
+    MAX_MEMORY_RECORDS = int(
+        os.getenv(
+            "MAX_MEMORY_RECORDS",
+            "1000"
+        )
+    )
 
-if __name__ == "__main__":
-    app.run(
-        host="0.0.0.0",
-        port=Config.PORT,
-        debug=Config.DEBUG
+    # -----------------------------------------
+    # Replay buffer configuration
+    # -----------------------------------------
+
+    REPLAY_BUFFER_SIZE = int(
+        os.getenv(
+            "REPLAY_BUFFER_SIZE",
+            "500"
+        )
     )
