@@ -1,0 +1,95 @@
+:root {
+    /* ========================================
+       COLORS
+    ======================================== */
+
+    --color-background: #0b1120;
+    --color-surface: #111827;
+    --color-surface-light: #1e293b;
+    --color-surface-hover: #263449;
+
+    --color-primary: #06b6d4;
+    --color-primary-hover: #0891b2;
+    --color-primary-soft: rgba(6, 182, 212, 0.12);
+
+    --color-text: #f8fafc;
+    --color-text-secondary: #cbd5e1;
+    --color-muted: #94a3b8;
+
+    --color-border: #263449;
+    --color-border-light: #334155;
+
+    --color-success: #22c55e;
+    --color-success-soft: rgba(34, 197, 94, 0.12);
+
+    --color-warning: #f59e0b;
+    --color-warning-soft: rgba(245, 158, 11, 0.12);
+
+    --color-error: #ef4444;
+    --color-error-soft: rgba(239, 68, 68, 0.12);
+
+    --color-info: #3b82f6;
+    --color-info-soft: rgba(59, 130, 246, 0.12);
+
+    /* ========================================
+       TYPOGRAPHY
+    ======================================== */
+
+    --font-family:
+        Inter,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+
+    --font-size-xs: 11px;
+    --font-size-sm: 13px;
+    --font-size-md: 15px;
+    --font-size-lg: 18px;
+    --font-size-xl: 24px;
+    --font-size-2xl: 32px;
+    --font-size-3xl: 42px;
+
+    /* ========================================
+       SPACING
+    ======================================== */
+
+    --spacing-xs: 4px;
+    --spacing-small: 8px;
+    --spacing-medium: 16px;
+    --spacing-large: 24px;
+    --spacing-xl: 32px;
+    --spacing-2xl: 48px;
+    --spacing-3xl: 64px;
+
+    /* ========================================
+       BORDER RADIUS
+    ======================================== */
+
+    --radius-small: 6px;
+    --radius-medium: 10px;
+    --radius-large: 14px;
+    --radius-xl: 20px;
+
+    /* ========================================
+       LAYOUT
+    ======================================== */
+
+    --sidebar-width: 240px;
+    --header-height: 72px;
+    --content-max-width: 1400px;
+
+    /* ========================================
+       EFFECTS
+    ======================================== */
+
+    --shadow-small:
+        0 2px 8px rgba(0, 0, 0, 0.18);
+
+    --shadow-medium:
+        0 8px 24px rgba(0, 0, 0, 0.22);
+
+    --transition-fast: 0.2s ease;
+    --transition-medium: 0.3s ease;
+}
