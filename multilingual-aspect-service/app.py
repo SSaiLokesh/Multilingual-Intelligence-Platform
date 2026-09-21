@@ -1,4 +1,5 @@
 from flask import Flask
+from flask_cors import CORS
 
 from config import Config
 
@@ -13,15 +14,54 @@ def create_app():
 
     app = Flask(__name__)
 
+    # -----------------------------------------
+    # Enable CORS for React Frontend
+    # -----------------------------------------
+
+    CORS(
+        app,
+        resources={
+            r"/api/*": {
+                "origins": [
+                    "http://localhost:5173",
+                    "http://127.0.0.1:5173"
+                ]
+            }
+        },
+        methods=[
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "OPTIONS"
+        ],
+        allow_headers=[
+            "Content-Type",
+            "Authorization"
+        ],
+        supports_credentials=True
+    )
+
+    # -----------------------------------------
+    # Load configuration
+    # -----------------------------------------
+
     app.config.from_object(Config)
 
+    # -----------------------------------------
     # Main pipeline
+    # -----------------------------------------
+
     app.register_blueprint(
         process_bp,
         url_prefix=f"{Config.API_PREFIX}/process"
     )
 
+    # -----------------------------------------
     # Individual modules
+    # -----------------------------------------
+
     app.register_blueprint(
         preprocessing_bp,
         url_prefix=f"{Config.API_PREFIX}/preprocessing"
@@ -42,6 +82,10 @@ def create_app():
         url_prefix=f"{Config.API_PREFIX}/aspect"
     )
 
+    # -----------------------------------------
+    # Service information
+    # -----------------------------------------
+
     @app.get("/")
     def home():
         return {
@@ -49,6 +93,10 @@ def create_app():
             "version": Config.SERVICE_VERSION,
             "status": "running"
         }
+
+    # -----------------------------------------
+    # Health check
+    # -----------------------------------------
 
     @app.get("/health")
     def health():
