@@ -1,4 +1,5 @@
 from flask import Flask
+from flask_cors import CORS
 
 from config import Config
 from routes import bff_routes
@@ -12,6 +13,8 @@ def create_app():
     app = Flask(__name__)
 
     app.register_blueprint(bff_routes)
+
+    CORS(app)
 
     return app
 

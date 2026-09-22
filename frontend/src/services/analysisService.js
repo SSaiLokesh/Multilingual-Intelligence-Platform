@@ -1,7 +1,7 @@
 import api from "./api";
 
 const ENDPOINTS = {
-    ANALYZE_TEXT: "/process/text",
+    ANALYZE_TEXT: "/process/",
 };
 
 const normalizeLanguage = (language) => {
