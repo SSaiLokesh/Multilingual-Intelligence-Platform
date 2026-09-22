@@ -7,7 +7,7 @@ url = f"{BASE_URL}/process"
 
 payload = {
     "request_id": "req_12345678",
-    "text": "The camera quality is excellent but the battery life is poor."
+    "text": "The mobile display is bad but the battery life is poor."
 }
 
 try:

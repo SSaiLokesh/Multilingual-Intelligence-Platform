@@ -1,45 +1,19 @@
-class PredictionConfidence:
-    """
-    Represents a prediction label and confidence.
-    """
+"""
+Base model definitions.
 
-    def __init__(
-        self,
-        label,
-        confidence
-    ):
-        self.label = label
-        self.confidence = confidence
+This module is intentionally lightweight.
 
-    def to_dict(self):
-        return {
-            "label": self.label,
-            "confidence": self.confidence
-        }
+Future trained/pre-trained models can be loaded here
+without changing the external API or pipeline structure.
+"""
 
 
-class Prediction:
-    """
-    Represents the combined sentiment and stance
-    prediction for an aspect.
-    """
+class BasePredictionModel:
 
-    def __init__(
-        self,
-        aspect,
-        category,
-        sentiment,
-        stance
-    ):
-        self.aspect = aspect
-        self.category = category
-        self.sentiment = sentiment
-        self.stance = stance
+    def __init__(self, name="lightweight-model"):
+        self.name = name
 
-    def to_dict(self):
-        return {
-            "aspect": self.aspect,
-            "category": self.category,
-            "sentiment": self.sentiment,
-            "stance": self.stance
-        }
+    def predict(self, text):
+        raise NotImplementedError(
+            "Subclasses must implement predict()."
+        )
