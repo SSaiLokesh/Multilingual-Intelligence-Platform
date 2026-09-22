@@ -25,7 +25,8 @@ def create_app():
             r"/api/*": {
                 "origins": [
                     "http://localhost:5173",
-                    "http://127.0.0.1:5173"
+                    "http://127.0.0.1:5173",
+                    "https://multilingual-intelligence-platform.vercel.app/"
                 ]
             }
         },
