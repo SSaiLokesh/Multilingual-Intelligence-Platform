@@ -1,0 +1,41 @@
+[
+  {
+    "record_id": "rec_490d4d1390c8",
+    "request_id": "req_12345678",
+    "data": {
+      "text": "The camera quality is excellent but battery life is poor.",
+      "language": {
+        "code": "en",
+        "confidence": 0.98
+      },
+      "predictions": [
+        {
+          "aspect": "camera quality",
+          "category": "Camera",
+          "sentiment": {
+            "label": "positive",
+            "confidence": 0.95
+          },
+          "stance": {
+            "target": "camera quality",
+            "label": "support",
+            "confidence": 0.91
+          }
+        },
+        {
+          "aspect": "battery life",
+          "category": "Battery",
+          "sentiment": {
+            "label": "negative",
+            "confidence": 0.93
+          },
+          "stance": {
+            "target": "battery life",
+            "label": "against",
+            "confidence": 0.87
+          }
+        }
+      ]
+    }
+  }
+]

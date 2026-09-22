@@ -1,6 +1,7 @@
 import requests
 
 url = "http://localhost:8002/analyze"
+url = "https://multilingual-intelligence-platform-chsm.onrender.com/analyze"
 
 payload = {
     "request_id": "req_12345678",
