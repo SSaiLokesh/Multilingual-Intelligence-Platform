@@ -1,4 +1,5 @@
 from flask import Flask
+
 from flask_cors import CORS
 
 from config import Config
@@ -12,9 +13,28 @@ def create_app():
 
     app = Flask(__name__)
 
-    app.register_blueprint(bff_routes)
+    # Enable CORS for the frontend
+    CORS(
+        app,
+        resources={
+            r"/*": {
+                "origins": [
+                    "http://localhost:5173"
+                ]
+            }
+        },
+        methods=[
+            "GET",
+            "POST",
+            "OPTIONS"
+        ],
+        allow_headers=[
+            "Content-Type",
+            "Authorization"
+        ]
+    )
 
-    CORS(app)
+    app.register_blueprint(bff_routes)
 
     return app
 
