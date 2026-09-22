@@ -1,22 +1,84 @@
-def categorize_aspects(aspects: list, language: dict) -> list:
+CATEGORY_KEYWORDS = {
 
-    categorized_aspects = []
+    "Camera": {
+        "camera",
+        "cameras",
+        "photo",
+        "photos",
+        "image",
+        "images",
+        "lens"
+    },
+
+    "Battery": {
+        "battery",
+        "charging",
+        "charger"
+    },
+
+    "Display": {
+        "display",
+        "screen",
+        "brightness",
+        "resolution"
+    },
+
+    "Performance": {
+        "performance",
+        "processor",
+        "speed",
+        "ram",
+        "memory"
+    },
+
+    "Audio": {
+        "audio",
+        "speaker",
+        "speakers",
+        "sound",
+        "microphone"
+    },
+
+    "Design": {
+        "design",
+        "body",
+        "build",
+        "appearance"
+    }
+}
+
+
+def categorize_aspects(
+    aspects: list,
+    language: dict
+) -> list:
+
+    results = []
 
     for aspect in aspects:
 
-        aspect_text = aspect.get("text", "")
+        aspect_text = aspect.get(
+            "text",
+            ""
+        ).strip()
+
+        words = {
+            word.lower()
+            for word in aspect_text.split()
+        }
 
         category = "Other"
 
-        if "camera" in aspect_text.lower():
-            category = "Camera"
+        for category_name, keywords in CATEGORY_KEYWORDS.items():
 
-        elif "battery" in aspect_text.lower():
-            category = "Battery"
+            if words.intersection(keywords):
 
-        categorized_aspects.append({
+                category = category_name
+                break
+
+        results.append({
             "text": aspect_text,
             "category": category
         })
 
-    return categorized_aspects
+    return results

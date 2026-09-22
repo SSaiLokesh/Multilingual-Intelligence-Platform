@@ -1,7 +1,7 @@
 import requests
 import json
 
-BASE_URL = "https://multilingual-intelligence-platform-6y6p.onrender.com"
+BASE_URL = "https://multilingual-intelligence-platform.onrender.com/"
 
 url = f"{BASE_URL}/process"
 

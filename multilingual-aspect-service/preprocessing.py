@@ -5,21 +5,49 @@ import unicodedata
 def normalize(text: str) -> str:
 
     if not isinstance(text, str):
-        raise ValueError("Input text must be a string.")
+        raise ValueError(
+            "Text must be a string."
+        )
 
-    # Unicode normalization
-    text = unicodedata.normalize("NFKC", text)
+    if not text.strip():
+        raise ValueError(
+            "Text cannot be empty."
+        )
 
-    # Remove HTML tags
-    text = re.sub(r"<[^>]+>", " ", text)
+    text = unicodedata.normalize(
+        "NFKC",
+        text
+    )
 
-    # Replace line breaks and tabs with spaces
-    text = re.sub(r"[\r\n\t]+", " ", text)
+    text = re.sub(
+        r"<[^>]+>",
+        " ",
+        text
+    )
 
-    # Remove excessive whitespace
-    text = re.sub(r"\s+", " ", text)
+    text = "".join(
+        char
+        for char in text
+        if char.isprintable()
+        or char in "\n\r\t"
+    )
 
-    # Remove leading/trailing spaces
-    text = text.strip()
+    text = re.sub(
+        r"[\r\n\t]+",
+        " ",
+        text
+    )
 
-    return text
+    text = re.sub(
+        r"\s+",
+        " ",
+        text
+    )
+
+    text = re.sub(
+        r"\s+([,.!?;:])",
+        r"\1",
+        text
+    )
+
+    return text.strip()
