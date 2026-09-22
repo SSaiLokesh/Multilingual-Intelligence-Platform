@@ -1,72 +1,129 @@
-# BFF
+# BFF — Backend for Frontend
 
-Backend-for-Frontend service for the Continuous Multilingual Aspect Sentiment and Stance Intelligence Platform.
+The BFF is the single backend entry point for the Multilingual Intelligence Platform frontend.
 
-## Responsibility
+It does not perform NLP or machine learning.
 
-The BFF is the public backend entry point for the frontend.
-
-It is responsible for:
-
-- Receiving frontend requests
-- Validating input
-- Generating request IDs
-- Calling backend microservices
-- Orchestrating the processing pipeline
-- Aggregating service responses
-- Returning the final response
-- Handling service errors
-
-The BFF does not contain NLP or machine-learning logic.
-
-## Architecture
+Its responsibility is to orchestrate:
 
 Frontend
-    |
-    v
+    ↓
 BFF
-    |
-    +--> Multilingual + Aspect Service
-    |
-    +--> Sentiment + Stance Service
-    |
-    +--> Adaptation Service
+    ↓
+Service 1 — Multilingual + Aspect
+    ↓
+Service 2 — Sentiment + Stance
+    ↓
+BFF
+    ↓
+Service 3 — Adaptation
+    ↓
+BFF
+    ↓
+Frontend
 
-## Default Port
+## Port
 
-8000
+BFF runs on:
 
-## API Prefix
+http://localhost:8000
 
-/api/v1
+## Services
+
+Service 1:
+
+http://localhost:8001
+
+Service 2:
+
+http://localhost:8002
+
+Service 3:
+
+http://localhost:8003
 
 ## Endpoints
 
-### Health
+### POST /process
 
-GET /health
+Main processing endpoint.
 
-### Process Text
+Request:
 
-POST /api/v1/process/text
+{
+  "request_id": "req_12345678",
+  "text": "The camera quality is excellent but battery life is poor."
+}
 
-### Process Dataset
+The BFF sends the request through all required services and returns the combined result.
 
-POST /api/v1/process/dataset
+### GET /health
 
-### Get Result
+Checks whether the BFF is running.
 
-GET /api/v1/results/{id}
+## Project Structure
 
-### Get Results
+bff/
+├── app.py
+├── config.py
+├── routes.py
+├── views.py
+├── pipeline.py
+├── service1_client.py
+├── service2_client.py
+├── service3_client.py
+├── requirements.txt
+├── .env.example
+└── README.md
 
-GET /api/v1/results
+## Responsibilities
 
-## Environment Variables
+### app.py
 
-MULTILINGUAL_ASPECT_SERVICE_URL
-SENTIMENT_STANCE_SERVICE_URL
-ADAPTATION_SERVICE_URL
-SERVICE_TIMEOUT
-API_PREFIX
-DEBUG
+Starts the Flask application.
+
+### config.py
+
+Contains BFF and service configuration.
+
+### routes.py
+
+Defines HTTP routes.
+
+### views.py
+
+Handles incoming HTTP requests and outgoing HTTP responses.
+
+### pipeline.py
+
+Coordinates the complete Service 1 → Service 2 → Service 3 workflow.
+
+### service1_client.py
+
+Communicates with Service 1.
+
+### service2_client.py
+
+Communicates with Service 2.
+
+### service3_client.py
+
+Communicates with Service 3.
+
+## Important Rule
+
+The BFF must not contain:
+
+- language detection
+- aspect extraction
+- sentiment calculation
+- stance calculation
+- model training
+- model inference
+- NLP preprocessing
+
+Those responsibilities belong to the individual services.
+
+The BFF only:
+
+Receive → Call → Pass → Combine → Call → Return

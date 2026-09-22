@@ -1,34 +1,13 @@
-import os
-
-
 class Config:
     """
-    Application configuration for the BFF.
+    Central configuration for the BFF.
     """
 
-    # Flask
-    DEBUG = os.getenv("DEBUG", "True").lower() == "true"
+    BFF_HOST = "0.0.0.0"
+    BFF_PORT = 8000
 
-    # API version
-    API_PREFIX = os.getenv("API_PREFIX", "/api/v1")
+    SERVICE1_URL = "http://localhost:8001"
+    SERVICE2_URL = "http://localhost:8002"
+    SERVICE3_URL = "http://localhost:8003"
 
-    # Service URLs
-    MULTILINGUAL_ASPECT_SERVICE_URL = os.getenv(
-        "MULTILINGUAL_ASPECT_SERVICE_URL",
-        "http://localhost:8001"
-    )
-
-    SENTIMENT_STANCE_SERVICE_URL = os.getenv(
-        "SENTIMENT_STANCE_SERVICE_URL",
-        "http://localhost:8002"
-    )
-
-    ADAPTATION_SERVICE_URL = os.getenv(
-        "ADAPTATION_SERVICE_URL",
-        "http://localhost:8003"
-    )
-
-    # Request timeout in seconds
-    SERVICE_TIMEOUT = int(
-        os.getenv("SERVICE_TIMEOUT", "30")
-    )
+    REQUEST_TIMEOUT = 60

@@ -1,6 +1,6 @@
 import requests
 
-url = "http://localhost:8003/adapt"
+url = "https://multilingual-intelligence-platform-6y6p.onrender.com//adapt"
 
 payload = {
     "request_id": "req_12345678",
