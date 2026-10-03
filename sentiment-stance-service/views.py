@@ -71,6 +71,8 @@ def analyze_view():
                     "message": "language is required."
                 }
             }), 400
+        
+        print(aspects,type(aspects))
 
         if not isinstance(aspects, list) or not aspects:
             print("[SERVICE 2 ERROR] aspects are missing or invalid.")
