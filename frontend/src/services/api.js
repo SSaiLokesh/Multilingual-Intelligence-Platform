@@ -1,6 +1,6 @@
 const API_BASE_URL =
     import.meta.env.VITE_API_BASE_URL ||
-    "https://multilingual-intelligence-platform-bff.onrender.com";
+    "http://127.0.0.1:8000";
 
 const DEFAULT_TIMEOUT = 15000;
 
@@ -40,7 +40,11 @@ const parseResponse = async (response) => {
         response.headers.get("content-type") || "";
 
     if (contentType.includes("application/json")) {
-        return response.json();
+        try {
+            return await response.json();
+        } catch {
+            return null;
+        }
     }
 
     const text = await response.text();
@@ -126,7 +130,25 @@ const request = async (
         timeout = DEFAULT_TIMEOUT,
     } = options;
 
-    const url = `${API_BASE_URL}${endpoint}`;
+    /*
+     * Make sure endpoint starts with "/"
+     */
+    const normalizedEndpoint = endpoint.startsWith("/")
+        ? endpoint
+        : `/${endpoint}`;
+
+    /*
+     * Remove trailing "/" from base URL
+     */
+    const normalizedBaseUrl =
+        API_BASE_URL.replace(/\/+$/, "");
+
+    const url =
+        `${normalizedBaseUrl}${normalizedEndpoint}`;
+
+    console.log(
+        `[API] ${method} ${url}`
+    );
 
     const timeoutController =
         createTimeoutSignal(timeout);
@@ -168,12 +190,17 @@ const request = async (
             );
         }
 
+        console.error(
+            "[API] Network error:",
+            error
+        );
+
         throw new ApiError(
             "Unable to connect to the backend.",
             {
                 code: "NETWORK_ERROR",
                 userMessage:
-                    "Unable to connect to the analysis service. Please make sure the Flask BFF is running.",
+                    "Unable to connect to the analysis service. Please make sure the Flask backend is running on port 8000.",
             }
         );
     }
@@ -181,6 +208,11 @@ const request = async (
     timeoutController.clear();
 
     const data = await parseResponse(response);
+
+    console.log(
+        `[API] Response ${response.status}:`,
+        data
+    );
 
     if (!response.ok) {
         const code =

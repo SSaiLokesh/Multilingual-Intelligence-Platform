@@ -11,6 +11,7 @@ const ENDPOINTS = {
  * Falls back to a timestamp-based ID if randomUUID
  * is not available.
  */
+
 const generateRequestId = () => {
     if (
         typeof crypto !== "undefined" &&
